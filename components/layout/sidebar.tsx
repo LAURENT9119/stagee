@@ -18,6 +18,8 @@ export function Sidebar({ role }: SidebarProps) {
         return [
           { href: "/admin", icon: BarChart3, label: "Gestion des membres" },
           { href: "/admin/stagiaires", icon: Users, label: "Gestion des stagiaires" },
+          { href: "/admin/templates", icon: FileText, label: "Modèles de documents" },
+          { href: "/admin/reports", icon: BarChart3, label: "Rapports" },
           { href: "/admin/profile", icon: User, label: "Mon profil" },
         ]
       case "rh":
