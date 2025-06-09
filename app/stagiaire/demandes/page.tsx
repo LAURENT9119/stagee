@@ -8,24 +8,68 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Search, Plus, Filter } from "lucide-react"
-import { mockDemandes } from "@/lib/mock-data"
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { demandesService } from "@/lib/services/demandes-service"
+import { authService } from "@/lib/services/auth-service"
 
 export default function DemandesPage() {
-  const user = { name: "Lucas Bernard", role: "stagiaire" }
+  const [user, setUser] = useState<any>(null)
+  const [demandes, setDemandes] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [typeFilter, setTypeFilter] = useState("all")
+  const router = useRouter()
 
-  // Filtrer les demandes pour ce stagiaire (id=4)
-  const stagiaireId = "4" // Lucas Bernard
-  const demandes = mockDemandes.filter((dem) => dem.stagiaireId === stagiaireId)
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const userResult = await authService.getCurrentUser()
+        if (!userResult.user) {
+          router.push("/auth/login")
+          return
+        }
+
+        const profileResult = await authService.getUserProfile(userResult.user.id)
+        if (!profileResult.profile || profileResult.profile.role !== "stagiaire") {
+          router.push("/auth/login")
+          return
+        }
+
+        setUser(profileResult.profile)
+
+        // Load demandes for this stagiaire
+        const demandesData = await demandesService.getAll({
+          stagiaireId: userResult.user.id,
+        })
+        setDemandes(demandesData || [])
+      } catch (error) {
+        console.error("Erreur lors du chargement:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadData()
+  }, [router])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+          <p className="mt-4">Chargement...</p>
+        </div>
+      </div>
+    )
+  }
 
   const filteredDemandes = demandes.filter((demande) => {
     const matchesSearch =
       demande.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      demande.details.toLowerCase().includes(searchTerm.toLowerCase())
+      (demande.description && demande.description.toLowerCase().includes(searchTerm.toLowerCase()))
 
     const matchesStatus = statusFilter === "all" || demande.statut === statusFilter
     const matchesType = typeFilter === "all" || demande.type === typeFilter
@@ -144,17 +188,21 @@ export default function DemandesPage() {
                   ) : (
                     filteredDemandes.map((demande) => (
                       <tr key={demande.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{demande.date}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {new Date(demande.created_at).toLocaleDateString("fr-FR")}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {demande.type.replace("_", " ")}
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">{demande.details}</td>
+                        <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
+                          {demande.description || demande.titre}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <Badge
                             className={`${
-                              demande.statut === "Validé"
+                              demande.statut === "approuve"
                                 ? "bg-green-100 text-green-800"
-                                : demande.statut === "Refusé"
+                                : demande.statut === "refuse"
                                   ? "bg-red-100 text-red-800"
                                   : "bg-orange-100 text-orange-800"
                             }`}

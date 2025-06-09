@@ -20,3 +20,6 @@ export function getSupabaseClient() {
 
 // Export par défaut
 export default getSupabaseClient
+
+// Named export for compatibility
+export const supabase = getSupabaseClient()

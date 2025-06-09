@@ -12,7 +12,6 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import Link from "next/link"
-import { createClient } from "@/lib/supabase/client"
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -27,7 +26,6 @@ export default function RegisterPage() {
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -51,63 +49,23 @@ export default function RegisterPage() {
     setLoading(true)
 
     try {
-      // Inscription avec Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            nom: formData.nom,
-            prenom: formData.prenom,
-            role: formData.role,
-            telephone: formData.telephone,
-          },
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
+        body: JSON.stringify(formData),
       })
 
-      if (authError) {
-        setError(authError.message)
+      const result = await response.json()
+
+      if (!response.ok) {
+        setError(result.error || "Erreur lors de l'inscription")
         return
       }
 
-      if (authData.user) {
-        // Créer le profil utilisateur
-        const { error: profileError } = await supabase.from("users").insert({
-          id: authData.user.id,
-          email: formData.email,
-          name: `${formData.prenom} ${formData.nom}`,
-          role: formData.role,
-          phone: formData.telephone || null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-
-        if (profileError) {
-          console.error("Erreur profil:", profileError)
-        }
-
-        // Si c'est un stagiaire, créer l'entrée stagiaire
-        if (formData.role === "stagiaire") {
-          const { error: stagiaireError } = await supabase.from("stagiaires").insert({
-            user_id: authData.user.id,
-            nom: formData.nom,
-            prenom: formData.prenom,
-            email: formData.email,
-            telephone: formData.telephone || null,
-            periode: "Non défini",
-            statut: "en_attente",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-
-          if (stagiaireError) {
-            console.error("Erreur stagiaire:", stagiaireError)
-          }
-        }
-
-        // Redirection vers la page de connexion
-        router.push("/auth/login?message=Compte créé avec succès ! Vérifiez votre email pour confirmer votre compte.")
-      }
+      // Redirection immédiate vers la page de connexion
+      router.push("/auth/login?message=Compte créé avec succès ! Vous pouvez maintenant vous connecter.")
     } catch (err) {
       console.error("Erreur:", err)
       setError("Une erreur est survenue lors de l'inscription")

@@ -1,8 +1,8 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 
-// Créer un client Supabase avec la clé de service pour les opérations admin
-const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+// Client Supabase avec clé de service pour bypasser RLS
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
   auth: {
     autoRefreshToken: false,
     persistSession: false,
@@ -13,16 +13,18 @@ export async function POST(request: Request) {
   try {
     const { email, password, nom, prenom, telephone, role } = await request.json()
 
-    // Validation des données
+    console.log("Données reçues:", { email, nom, prenom, role })
+
+    // Validation
     if (!email || !password || !nom || !prenom || !role) {
       return NextResponse.json({ error: "Tous les champs obligatoires doivent être remplis" }, { status: 400 })
     }
 
-    // Créer l'utilisateur avec la clé de service
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+    // Créer l'utilisateur avec confirmation automatique
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
       password,
-      email_confirm: true,
+      email_confirm: true, // Confirmer automatiquement l'email
       user_metadata: {
         nom,
         prenom,
@@ -39,8 +41,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Erreur lors de la création de l'utilisateur" }, { status: 400 })
     }
 
+    console.log("Utilisateur créé:", authData.user.id)
+
     // Créer l'entrée dans la table users
-    const { error: userError } = await supabaseAdmin.from("users").insert({
+    const { error: userError } = await supabase.from("users").insert({
       id: authData.user.id,
       email: email,
       name: `${prenom} ${nom}`,
@@ -53,13 +57,15 @@ export async function POST(request: Request) {
     if (userError) {
       console.error("Erreur user:", userError)
       // Supprimer l'utilisateur Auth en cas d'erreur
-      await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
-      return NextResponse.json({ error: "Erreur lors de la création du profil utilisateur" }, { status: 500 })
+      await supabase.auth.admin.deleteUser(authData.user.id)
+      return NextResponse.json({ error: `Erreur lors de la création du profil: ${userError.message}` }, { status: 500 })
     }
 
-    // Si c'est un stagiaire, créer aussi l'entrée dans la table stagiaires
+    console.log("Profil utilisateur créé")
+
+    // Si c'est un stagiaire, créer l'entrée dans la table stagiaires
     if (role === "stagiaire") {
-      const { error: stagiaireError } = await supabaseAdmin.from("stagiaires").insert({
+      const { error: stagiaireError } = await supabase.from("stagiaires").insert({
         user_id: authData.user.id,
         nom: nom,
         prenom: prenom,
@@ -74,6 +80,8 @@ export async function POST(request: Request) {
       if (stagiaireError) {
         console.error("Erreur stagiaire:", stagiaireError)
         // Ne pas faire échouer l'inscription pour cette erreur
+      } else {
+        console.log("Profil stagiaire créé")
       }
     }
 
