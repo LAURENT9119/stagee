@@ -1,56 +1,88 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
+
+// Créer un client Supabase avec la clé de service pour les opérations admin
+const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+  },
+})
 
 export async function POST(request: Request) {
   try {
-    const { email, password, userData } = await request.json()
-    const supabase = createServerSupabaseClient()
+    const { email, password, nom, prenom, telephone, role } = await request.json()
 
-    // Créer l'utilisateur dans Auth
-    const { data, error } = await supabase.auth.signUp({
+    // Validation des données
+    if (!email || !password || !nom || !prenom || !role) {
+      return NextResponse.json({ error: "Tous les champs obligatoires doivent être remplis" }, { status: 400 })
+    }
+
+    // Créer l'utilisateur avec la clé de service
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      options: {
-        data: {
-          name: userData.name,
-          role: userData.role || "stagiaire",
-        },
+      email_confirm: true,
+      user_metadata: {
+        nom,
+        prenom,
+        role,
       },
     })
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+    if (authError) {
+      console.error("Erreur auth:", authError)
+      return NextResponse.json({ error: authError.message }, { status: 400 })
     }
 
-    if (!data.user) {
+    if (!authData.user) {
       return NextResponse.json({ error: "Erreur lors de la création de l'utilisateur" }, { status: 400 })
     }
 
     // Créer l'entrée dans la table users
-    const { error: insertError } = await supabase.from("users").insert({
-      id: data.user.id,
+    const { error: userError } = await supabaseAdmin.from("users").insert({
+      id: authData.user.id,
       email: email,
-      name: userData.name || "",
-      role: userData.role || "stagiaire",
-      phone: userData.phone,
-      address: userData.address,
-      department: userData.department,
-      position: userData.position,
+      name: `${prenom} ${nom}`,
+      role: role,
+      phone: telephone || null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
 
-    if (insertError) {
+    if (userError) {
+      console.error("Erreur user:", userError)
       // Supprimer l'utilisateur Auth en cas d'erreur
-      await supabase.auth.admin.deleteUser(data.user.id)
-      return NextResponse.json({ error: insertError.message }, { status: 500 })
+      await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
+      return NextResponse.json({ error: "Erreur lors de la création du profil utilisateur" }, { status: 500 })
+    }
+
+    // Si c'est un stagiaire, créer aussi l'entrée dans la table stagiaires
+    if (role === "stagiaire") {
+      const { error: stagiaireError } = await supabaseAdmin.from("stagiaires").insert({
+        user_id: authData.user.id,
+        nom: nom,
+        prenom: prenom,
+        email: email,
+        telephone: telephone || null,
+        periode: "Non défini",
+        statut: "en_attente",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+
+      if (stagiaireError) {
+        console.error("Erreur stagiaire:", stagiaireError)
+        // Ne pas faire échouer l'inscription pour cette erreur
+      }
     }
 
     return NextResponse.json({
-      user: data.user,
-      session: data.session,
+      user: authData.user,
+      message: "Compte créé avec succès",
     })
   } catch (error) {
+    console.error("Erreur inscription:", error)
     return NextResponse.json({ error: "Erreur interne du serveur" }, { status: 500 })
   }
 }

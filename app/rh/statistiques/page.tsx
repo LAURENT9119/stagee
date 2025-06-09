@@ -1,11 +1,14 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { Sidebar } from "@/components/layout/sidebar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { mockGraphData } from "@/lib/mock-data"
+import { statisticsService } from "@/lib/services/statistics-service"
+import { authService } from "@/lib/services/auth-service"
+import { useRouter } from "next/navigation"
 import {
   BarChart,
   Bar,
@@ -21,10 +24,79 @@ import {
 } from "recharts"
 
 export default function StatistiquesPage() {
-  const user = { name: "Marie Dupont", role: "rh" }
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState<any>({
+    stagiairesByMonth: [],
+    demandesByType: [],
+    tauxAcceptation: [],
+    stagiairesByDepartement: [],
+    globalStats: {},
+  })
+  const router = useRouter()
 
   // Couleurs pour les graphiques
   const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8"]
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const userResult = await authService.getCurrentUser()
+        if (!userResult.user) {
+          router.push("/auth/login")
+          return
+        }
+
+        const profileResult = await authService.getUserProfile(userResult.user.id)
+        if (!profileResult.profile || profileResult.profile.role !== "rh") {
+          router.push("/auth/login")
+          return
+        }
+
+        setUser(profileResult.profile)
+
+        // Charger toutes les statistiques
+        const [stagiairesByMonth, demandesByType, tauxAcceptation, stagiairesByDepartement, globalStats] =
+          await Promise.all([
+            statisticsService.getStagiairesByMonth(),
+            statisticsService.getDemandesByType(),
+            statisticsService.getTauxAcceptation(),
+            statisticsService.getStagiairesByDepartement(),
+            statisticsService.getGlobalStats(),
+          ])
+
+        setStats({
+          stagiairesByMonth,
+          demandesByType,
+          tauxAcceptation,
+          stagiairesByDepartement,
+          globalStats,
+        })
+      } catch (error) {
+        console.error("Erreur lors du chargement:", error)
+        router.push("/auth/login")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadData()
+  }, [router])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+          <p className="mt-4">Chargement des statistiques...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return null
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -68,13 +140,16 @@ export default function StatistiquesPage() {
                     </svg>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">8</div>
-                    <p className="text-xs text-muted-foreground">+12% par rapport au mois dernier</p>
+                    <div className="text-2xl font-bold">{stats.globalStats.totalStagiaires}</div>
+                    <p className="text-xs text-muted-foreground">
+                      {stats.globalStats.stagiaireActifs} actuellement actifs
+                    </p>
                   </CardContent>
                 </Card>
+
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Demandes en cours</CardTitle>
+                    <CardTitle className="text-sm font-medium">Demandes totales</CardTitle>
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       viewBox="0 0 24 24"
@@ -89,10 +164,11 @@ export default function StatistiquesPage() {
                     </svg>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">5</div>
-                    <p className="text-xs text-muted-foreground">-3% par rapport au mois dernier</p>
+                    <div className="text-2xl font-bold">{stats.globalStats.totalDemandes}</div>
+                    <p className="text-xs text-muted-foreground">{stats.globalStats.demandesEnAttente} en attente</p>
                   </CardContent>
                 </Card>
+
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Taux d'acceptation</CardTitle>
@@ -110,8 +186,10 @@ export default function StatistiquesPage() {
                     </svg>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">70%</div>
-                    <p className="text-xs text-muted-foreground">+5% par rapport au mois dernier</p>
+                    <div className="text-2xl font-bold">{stats.globalStats.tauxAcceptation}%</div>
+                    <p className="text-xs text-muted-foreground">
+                      {stats.globalStats.demandesApprouvees} demandes approuvées
+                    </p>
                   </CardContent>
                 </Card>
               </div>
@@ -125,7 +203,7 @@ export default function StatistiquesPage() {
                     <div className="h-[300px]">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart
-                          data={mockGraphData.stagiairesMensuels}
+                          data={stats.stagiairesByMonth}
                           margin={{
                             top: 5,
                             right: 30,
@@ -154,16 +232,16 @@ export default function StatistiquesPage() {
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
-                            data={mockGraphData.demandesParType}
+                            data={stats.demandesByType}
                             cx="50%"
                             cy="50%"
                             labelLine={false}
-                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                            label={({ type, percent }) => `${type}: ${(percent * 100).toFixed(0)}%`}
                             outerRadius={80}
                             fill="#8884d8"
                             dataKey="nombre"
                           >
-                            {mockGraphData.demandesParType.map((entry, index) => (
+                            {stats.demandesByType.map((entry: any, index: number) => (
                               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                             ))}
                           </Pie>
@@ -184,7 +262,7 @@ export default function StatistiquesPage() {
                   <div className="h-[300px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
-                        data={mockGraphData.departements}
+                        data={stats.stagiairesByDepartement}
                         layout="vertical"
                         margin={{
                           top: 5,
@@ -215,7 +293,7 @@ export default function StatistiquesPage() {
                   <div className="h-[400px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
-                        data={mockGraphData.stagiairesMensuels}
+                        data={stats.stagiairesByMonth}
                         margin={{
                           top: 5,
                           right: 30,
@@ -247,16 +325,16 @@ export default function StatistiquesPage() {
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
-                            data={mockGraphData.demandesParType}
+                            data={stats.demandesByType}
                             cx="50%"
                             cy="50%"
                             labelLine={false}
-                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                            label={({ type, percent }) => `${type}: ${(percent * 100).toFixed(0)}%`}
                             outerRadius={80}
                             fill="#8884d8"
                             dataKey="nombre"
                           >
-                            {mockGraphData.demandesParType.map((entry, index) => (
+                            {stats.demandesByType.map((entry: any, index: number) => (
                               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                             ))}
                           </Pie>
@@ -277,11 +355,11 @@ export default function StatistiquesPage() {
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
-                            data={mockGraphData.tauxAcceptation}
+                            data={stats.tauxAcceptation}
                             cx="50%"
                             cy="50%"
                             labelLine={false}
-                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                            label={({ type, pourcentage }) => `${type}: ${pourcentage.toFixed(0)}%`}
                             outerRadius={80}
                             fill="#8884d8"
                             dataKey="pourcentage"
@@ -309,7 +387,7 @@ export default function StatistiquesPage() {
                   <div className="h-[400px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
-                        data={mockGraphData.departements}
+                        data={stats.stagiairesByDepartement}
                         layout="vertical"
                         margin={{
                           top: 5,

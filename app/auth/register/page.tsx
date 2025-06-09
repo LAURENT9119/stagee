@@ -2,35 +2,122 @@
 
 import type React from "react"
 
+import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import Link from "next/link"
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
     email: "",
-    phone: "",
     password: "",
     confirmPassword: "",
+    nom: "",
+    prenom: "",
+    telephone: "",
+    role: "stagiaire" as const,
   })
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const supabase = createClient()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Simulation d'inscription - redirection vers stagiaire par défaut
-    router.push("/stagiaire")
+    setError("")
+
+    if (formData.password !== formData.confirmPassword) {
+      setError("Les mots de passe ne correspondent pas")
+      return
+    }
+
+    if (formData.password.length < 6) {
+      setError("Le mot de passe doit contenir au moins 6 caractères")
+      return
+    }
+
+    if (!formData.nom || !formData.prenom) {
+      setError("Le nom et prénom sont obligatoires")
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      // Inscription avec Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            nom: formData.nom,
+            prenom: formData.prenom,
+            role: formData.role,
+            telephone: formData.telephone,
+          },
+        },
+      })
+
+      if (authError) {
+        setError(authError.message)
+        return
+      }
+
+      if (authData.user) {
+        // Créer le profil utilisateur
+        const { error: profileError } = await supabase.from("users").insert({
+          id: authData.user.id,
+          email: formData.email,
+          name: `${formData.prenom} ${formData.nom}`,
+          role: formData.role,
+          phone: formData.telephone || null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+
+        if (profileError) {
+          console.error("Erreur profil:", profileError)
+        }
+
+        // Si c'est un stagiaire, créer l'entrée stagiaire
+        if (formData.role === "stagiaire") {
+          const { error: stagiaireError } = await supabase.from("stagiaires").insert({
+            user_id: authData.user.id,
+            nom: formData.nom,
+            prenom: formData.prenom,
+            email: formData.email,
+            telephone: formData.telephone || null,
+            periode: "Non défini",
+            statut: "en_attente",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+
+          if (stagiaireError) {
+            console.error("Erreur stagiaire:", stagiaireError)
+          }
+        }
+
+        // Redirection vers la page de connexion
+        router.push("/auth/login?message=Compte créé avec succès ! Vérifiez votre email pour confirmer votre compte.")
+      }
+    } catch (err) {
+      console.error("Erreur:", err)
+      setError("Une erreur est survenue lors de l'inscription")
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    })
+  const handleChange = (field: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
   return (
@@ -39,9 +126,16 @@ export default function RegisterPage() {
 
       <main className="flex-1 flex">
         <div
-          className="w-1/2 bg-cover bg-center"
-          style={{ backgroundImage: "url('/placeholder.svg?height=600&width=800')" }}
-        ></div>
+          className="w-1/2 bg-cover bg-center relative"
+          style={{ backgroundImage: "url('/images/inscription.png')" }}
+        >
+          <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
+            <div className="text-white text-center">
+              <h1 className="text-4xl font-bold mb-4">Rejoignez Bridge</h1>
+              <p className="text-xl">Créez votre compte et commencez votre parcours</p>
+            </div>
+          </div>
+        </div>
 
         <div className="w-1/2 bg-gray-100 flex items-center justify-center p-8">
           <div className="w-full max-w-md space-y-8">
@@ -49,43 +143,89 @@ export default function RegisterPage() {
               <h2 className="text-3xl font-bold text-gray-900">Rejoignez nous dès aujourd'hui !</h2>
             </div>
 
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="prenom">Prénom</Label>
+                  <Input
+                    id="prenom"
+                    type="text"
+                    value={formData.prenom}
+                    onChange={(e) => handleChange("prenom", e.target.value)}
+                    className="mt-1"
+                    required
+                    disabled={loading}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="nom">Nom</Label>
+                  <Input
+                    id="nom"
+                    type="text"
+                    value={formData.nom}
+                    onChange={(e) => handleChange("nom", e.target.value)}
+                    className="mt-1"
+                    required
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
               <div>
                 <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
-                  name="email"
                   type="email"
                   value={formData.email}
-                  onChange={handleChange}
+                  onChange={(e) => handleChange("email", e.target.value)}
                   className="mt-1"
                   required
+                  disabled={loading}
                 />
               </div>
 
               <div>
-                <Label htmlFor="phone">Numéro de téléphone</Label>
+                <Label htmlFor="telephone">Numéro de téléphone</Label>
                 <Input
-                  id="phone"
-                  name="phone"
+                  id="telephone"
                   type="tel"
-                  value={formData.phone}
-                  onChange={handleChange}
+                  value={formData.telephone}
+                  onChange={(e) => handleChange("telephone", e.target.value)}
                   className="mt-1"
-                  required
+                  disabled={loading}
                 />
+              </div>
+
+              <div>
+                <Label htmlFor="role">Rôle</Label>
+                <Select value={formData.role} onValueChange={(value) => handleChange("role", value)}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Sélectionnez votre rôle" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="stagiaire">Stagiaire</SelectItem>
+                    <SelectItem value="tuteur">Tuteur</SelectItem>
+                    <SelectItem value="rh">Ressources Humaines</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
                 <Label htmlFor="password">Mot de passe</Label>
                 <Input
                   id="password"
-                  name="password"
                   type="password"
                   value={formData.password}
-                  onChange={handleChange}
+                  onChange={(e) => handleChange("password", e.target.value)}
                   className="mt-1"
                   required
+                  disabled={loading}
                 />
               </div>
 
@@ -93,17 +233,17 @@ export default function RegisterPage() {
                 <Label htmlFor="confirmPassword">Confirmer mot de passe</Label>
                 <Input
                   id="confirmPassword"
-                  name="confirmPassword"
                   type="password"
                   value={formData.confirmPassword}
-                  onChange={handleChange}
+                  onChange={(e) => handleChange("confirmPassword", e.target.value)}
                   className="mt-1"
                   required
+                  disabled={loading}
                 />
               </div>
 
-              <Button type="submit" className="w-full bg-black text-white hover:bg-gray-800">
-                Envoyer
+              <Button type="submit" className="w-full bg-black text-white hover:bg-gray-800" disabled={loading}>
+                {loading ? "Inscription..." : "S'inscrire"}
               </Button>
 
               <div className="text-center">

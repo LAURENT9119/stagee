@@ -1,8 +1,5 @@
 import { createClient } from "@/lib/supabase/client"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import type { Database } from "@/lib/supabase/database.types"
-
-type Profile = Database["public"]["Tables"]["profiles"]["Row"]
 
 export class AuthService {
   private supabase = createClient()
@@ -16,35 +13,9 @@ export class AuthService {
 
       if (error) throw error
 
-      return { user: data.user, error: null }
+      return { user: data.user, session: data.session, error: null }
     } catch (error) {
-      return { user: null, error: error as Error }
-    }
-  }
-
-  async signUp(email: string, password: string, userData: Partial<Profile>) {
-    try {
-      const { data, error } = await this.supabase.auth.signUp({
-        email,
-        password,
-      })
-
-      if (error) throw error
-
-      if (data.user) {
-        // Créer le profil utilisateur
-        const { error: profileError } = await this.supabase.from("profiles").insert({
-          id: data.user.id,
-          email,
-          ...userData,
-        })
-
-        if (profileError) throw profileError
-      }
-
-      return { user: data.user, error: null }
-    } catch (error) {
-      return { user: null, error: error as Error }
+      return { user: null, session: null, error: error as Error }
     }
   }
 
@@ -73,7 +44,7 @@ export class AuthService {
 
   async getUserProfile(userId: string) {
     try {
-      const { data, error } = await this.supabase.from("profiles").select("*").eq("id", userId).single()
+      const { data, error } = await this.supabase.from("users").select("*").eq("id", userId).single()
 
       if (error) throw error
       return { profile: data, error: null }
