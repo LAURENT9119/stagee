@@ -1,123 +1,103 @@
-import { supabase } from "../supabase/client"
-import type { Database } from "../supabase/database.types"
+import { createClient } from "@/lib/supabase/client"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
+import type { Database } from "@/lib/supabase/database.types"
 
-export type User = Database["public"]["Tables"]["users"]["Row"]
+type Profile = Database["public"]["Tables"]["profiles"]["Row"]
 
-export const authService = {
-  async login(email: string, password: string) {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+export class AuthService {
+  private supabase = createClient()
 
-    if (error) throw new Error(error.message)
+  async signIn(email: string, password: string) {
+    try {
+      const { data, error } = await this.supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-    // Récupérer les informations utilisateur complètes
-    const { data: userData, error: userError } = await supabase
-      .from("users")
-      .select("*")
-      .eq("id", data.user.id)
-      .single()
+      if (error) throw error
 
-    if (userError) throw new Error(userError.message)
-
-    return {
-      user: userData,
-      session: data.session,
+      return { user: data.user, error: null }
+    } catch (error) {
+      return { user: null, error: error as Error }
     }
-  },
+  }
 
-  async register(email: string, password: string, userData: Partial<User>) {
-    // Créer l'utilisateur dans Auth
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          name: userData.name,
-          role: userData.role || "stagiaire",
-        },
-      },
-    })
+  async signUp(email: string, password: string, userData: Partial<Profile>) {
+    try {
+      const { data, error } = await this.supabase.auth.signUp({
+        email,
+        password,
+      })
 
-    if (error) throw new Error(error.message)
+      if (error) throw error
 
-    // Créer l'entrée dans la table users
-    const { error: insertError } = await supabase.from("users").insert({
-      id: data.user!.id,
-      email: email,
-      name: userData.name || "",
-      role: userData.role || "stagiaire",
-      phone: userData.phone,
-      address: userData.address,
-      department: userData.department,
-      position: userData.position,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
+      if (data.user) {
+        // Créer le profil utilisateur
+        const { error: profileError } = await this.supabase.from("profiles").insert({
+          id: data.user.id,
+          email,
+          ...userData,
+        })
 
-    if (insertError) throw new Error(insertError.message)
+        if (profileError) throw profileError
+      }
 
-    return {
-      user: data.user,
-      session: data.session,
+      return { user: data.user, error: null }
+    } catch (error) {
+      return { user: null, error: error as Error }
     }
-  },
+  }
 
-  async logout() {
-    const { error } = await supabase.auth.signOut()
-    if (error) throw new Error(error.message)
-    return true
-  },
+  async signOut() {
+    try {
+      const { error } = await this.supabase.auth.signOut()
+      if (error) throw error
+      return { error: null }
+    } catch (error) {
+      return { error: error as Error }
+    }
+  }
 
   async getCurrentUser() {
-    const { data, error } = await supabase.auth.getUser()
+    try {
+      const {
+        data: { user },
+        error,
+      } = await this.supabase.auth.getUser()
+      if (error) throw error
+      return { user, error: null }
+    } catch (error) {
+      return { user: null, error: error as Error }
+    }
+  }
 
-    if (error || !data.user) return null
+  async getUserProfile(userId: string) {
+    try {
+      const { data, error } = await this.supabase.from("profiles").select("*").eq("id", userId).single()
 
-    // Récupérer les informations utilisateur complètes
-    const { data: userData, error: userError } = await supabase
-      .from("users")
-      .select("*")
-      .eq("id", data.user.id)
-      .single()
+      if (error) throw error
+      return { profile: data, error: null }
+    } catch (error) {
+      return { profile: null, error: error as Error }
+    }
+  }
+}
 
-    if (userError) return null
+// Instance singleton
+export const authService = new AuthService()
 
-    return userData
-  },
+// Server-side auth helper
+export async function getServerUser() {
+  try {
+    const supabase = await createServerSupabaseClient()
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser()
 
-  async updateProfile(userId: string, userData: Partial<User>) {
-    const { error } = await supabase
-      .from("users")
-      .update({
-        ...userData,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", userId)
-
-    if (error) throw new Error(error.message)
-
-    return true
-  },
-
-  async updatePassword(password: string) {
-    const { error } = await supabase.auth.updateUser({
-      password,
-    })
-
-    if (error) throw new Error(error.message)
-
-    return true
-  },
-
-  async resetPassword(email: string) {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    })
-
-    if (error) throw new Error(error.message)
-
-    return true
-  },
+    if (error) throw error
+    return { user, error: null }
+  } catch (error) {
+    return { user: null, error: error as Error }
+  }
 }
