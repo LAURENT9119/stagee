@@ -1,21 +1,30 @@
-import { createClient } from "@/lib/supabase/client"
+import { supabase } from "../supabase/client"
 
 export const statisticsService = {
+  async getDashboardStats(userId: string, role: string) {
+    const { data, error } = await supabase.rpc("get_dashboard_stats", {
+      user_id: userId,
+      role,
+    })
+
+    if (error) throw new Error(error.message)
+
+    return data
+  },
+
   async getStagiairesByMonth() {
-    const supabase = createClient()
+    const { data, error } = await supabase.from("stagiaires").select("date_debut")
 
-    const { data, error } = await supabase.from("stagiaires").select("date_debut").not("date_debut", "is", null)
-
-    if (error) throw error
+    if (error) throw new Error(error.message)
 
     // Traiter les données pour obtenir le nombre de stagiaires par mois
     const months = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"]
-    const currentYear = new Date().getFullYear()
+
     const stagiairesByMonth = Array(12).fill(0)
 
     data.forEach((stagiaire) => {
-      const date = new Date(stagiaire.date_debut)
-      if (date.getFullYear() === currentYear) {
+      if (stagiaire.date_debut) {
+        const date = new Date(stagiaire.date_debut)
         const month = date.getMonth()
         stagiairesByMonth[month]++
       }
@@ -28,11 +37,9 @@ export const statisticsService = {
   },
 
   async getDemandesByType() {
-    const supabase = createClient()
+    const { data, error } = await supabase.from("demandes").select("type, count").select("type")
 
-    const { data, error } = await supabase.from("demandes").select("type")
-
-    if (error) throw error
+    if (error) throw new Error(error.message)
 
     // Compter les demandes par type
     const types: Record<string, number> = {}
@@ -69,11 +76,9 @@ export const statisticsService = {
   },
 
   async getTauxAcceptation() {
-    const supabase = createClient()
-
     const { data, error } = await supabase.from("demandes").select("statut")
 
-    if (error) throw error
+    if (error) throw new Error(error.message)
 
     // Compter les demandes par statut
     let acceptees = 0
@@ -81,34 +86,30 @@ export const statisticsService = {
     let enAttente = 0
 
     data.forEach((demande) => {
-      if (demande.statut === "approuvee") acceptees++
-      else if (demande.statut === "rejetee") refusees++
+      if (demande.statut === "Validé") acceptees++
+      else if (demande.statut === "Refusé") refusees++
       else enAttente++
     })
 
     const total = data.length
 
     return [
-      { type: "Acceptées", pourcentage: total > 0 ? (acceptees / total) * 100 : 0 },
-      { type: "Refusées", pourcentage: total > 0 ? (refusees / total) * 100 : 0 },
-      { type: "En attente", pourcentage: total > 0 ? (enAttente / total) * 100 : 0 },
+      { type: "Acceptées", pourcentage: total > 0 ? acceptees / total : 0 },
+      { type: "Refusées", pourcentage: total > 0 ? refusees / total : 0 },
+      { type: "En attente", pourcentage: total > 0 ? enAttente / total : 0 },
     ]
   },
 
   async getStagiairesByDepartement() {
-    const supabase = createClient()
+    const { data, error } = await supabase.from("stagiaires").select("departement")
 
-    const { data, error } = await supabase.from("stagiaires").select(`
-        profiles!inner(department)
-      `)
-
-    if (error) throw error
+    if (error) throw new Error(error.message)
 
     // Compter les stagiaires par département
     const departements: Record<string, number> = {}
 
     data.forEach((stagiaire) => {
-      const dept = stagiaire.profiles?.department || "Non spécifié"
+      const dept = stagiaire.departement || "Non spécifié"
       departements[dept] = (departements[dept] || 0) + 1
     })
 
@@ -119,43 +120,83 @@ export const statisticsService = {
     }))
   },
 
-  async getGlobalStats() {
-    const supabase = createClient()
+  async exportData(type: "stagiaires" | "demandes" | "documents", format: "csv" | "pdf") {
+    let data
 
-    // Nombre total de stagiaires
-    const { count: totalStagiaires } = await supabase.from("stagiaires").select("*", { count: "exact", head: true })
+    switch (type) {
+      case "stagiaires":
+        const { data: stagiaires, error: stagiaireError } = await supabase.from("stagiaires_view").select("*")
 
-    // Nombre de stagiaires actifs
-    const { count: stagiaireActifs } = await supabase
-      .from("stagiaires")
-      .select("*", { count: "exact", head: true })
-      .eq("statut", "actif")
+        if (stagiaireError) throw new Error(stagiaireError.message)
+        data = stagiaires
+        break
 
-    // Nombre total de demandes
-    const { count: totalDemandes } = await supabase.from("demandes").select("*", { count: "exact", head: true })
+      case "demandes":
+        const { data: demandes, error: demandeError } = await supabase.from("demandes_view").select("*")
 
-    // Demandes en attente
-    const { count: demandesEnAttente } = await supabase
-      .from("demandes")
-      .select("*", { count: "exact", head: true })
-      .eq("statut", "en_attente")
+        if (demandeError) throw new Error(demandeError.message)
+        data = demandes
+        break
 
-    // Demandes approuvées
-    const { count: demandesApprouvees } = await supabase
-      .from("demandes")
-      .select("*", { count: "exact", head: true })
-      .eq("statut", "approuvee")
+      case "documents":
+        const { data: documents, error: documentError } = await supabase.from("documents").select("*")
 
-    // Taux d'acceptation
-    const tauxAcceptation = totalDemandes > 0 ? ((demandesApprouvees || 0) / totalDemandes) * 100 : 0
-
-    return {
-      totalStagiaires: totalStagiaires || 0,
-      stagiaireActifs: stagiaireActifs || 0,
-      totalDemandes: totalDemandes || 0,
-      demandesEnAttente: demandesEnAttente || 0,
-      demandesApprouvees: demandesApprouvees || 0,
-      tauxAcceptation: Math.round(tauxAcceptation),
+        if (documentError) throw new Error(documentError.message)
+        data = documents
+        break
     }
+
+    if (format === "csv") {
+      return this.generateCSV(data)
+    } else {
+      // Générer le PDF (côté serveur)
+      const response = await fetch("/api/export-pdf", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ data, type }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Erreur lors de la génération du PDF")
+      }
+
+      return response.blob()
+    }
+  },
+
+  generateCSV(data: any[]) {
+    if (!data || data.length === 0) {
+      return new Blob([""], { type: "text/csv;charset=utf-8;" })
+    }
+
+    // Obtenir les en-têtes
+    const headers = Object.keys(data[0])
+
+    // Créer les lignes CSV
+    const csvRows = [
+      headers.join(","), // En-têtes
+      ...data.map((row) =>
+        headers
+          .map((header) => {
+            const cell = row[header]
+            // Échapper les virgules et les guillemets
+            if (cell === null || cell === undefined) return ""
+            const cellStr = String(cell)
+            if (cellStr.includes(",") || cellStr.includes('"') || cellStr.includes("\n")) {
+              return `"${cellStr.replace(/"/g, '""')}"`
+            }
+            return cellStr
+          })
+          .join(","),
+      ),
+    ]
+
+    // Joindre les lignes avec des sauts de ligne
+    const csvContent = csvRows.join("\n")
+
+    // Créer un Blob
+    return new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
   },
 }

@@ -1,25 +1,22 @@
-import { createBrowserClient } from "@supabase/ssr"
+import { createClient } from "@supabase/supabase-js"
 import type { Database } from "./database.types"
 
-export function createClient() {
-  return createBrowserClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  )
-}
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-// Client singleton pour éviter les re-créations
-let supabaseClient: ReturnType<typeof createClient> | null = null
+// Création du client Supabase pour le côté client
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey)
 
-export function getSupabaseClient() {
-  if (!supabaseClient) {
-    supabaseClient = createClient()
+// Fonction pour obtenir un client Supabase avec le token utilisateur
+export const getSupabaseClient = (accessToken?: string) => {
+  if (accessToken) {
+    return createClient<Database>(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+    })
   }
-  return supabaseClient
+  return supabase
 }
-
-// Export par défaut
-export default getSupabaseClient
-
-// Named export for compatibility
-export const supabase = getSupabaseClient()

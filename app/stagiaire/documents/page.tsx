@@ -1,7 +1,5 @@
 "use client"
 
-import type React from "react"
-
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { Sidebar } from "@/components/layout/sidebar"
@@ -9,7 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search, Filter, Plus, Download, Trash2, FileText, FileImage, FileIcon as FilePdf } from "lucide-react"
-import { useState, useEffect } from "react"
+import { mockDocuments } from "@/lib/mock-data"
+import { useState } from "react"
 import {
   Dialog,
   DialogContent,
@@ -21,116 +20,21 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { documentsService } from "@/lib/services/documents-service"
-import { authService } from "@/lib/services/auth-service"
-import { useRouter } from "next/navigation"
 
 export default function DocumentsPage() {
-  const [user, setUser] = useState<any>(null)
-  const [documents, setDocuments] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const user = { name: "Lucas Bernard", role: "stagiaire" }
   const [searchTerm, setSearchTerm] = useState("")
   const [formatFilter, setFormatFilter] = useState("all")
   const [typeFilter, setTypeFilter] = useState("all")
-  const router = useRouter()
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const userResult = await authService.getCurrentUser()
-        if (!userResult.user) {
-          router.push("/auth/login")
-          return
-        }
-
-        const profileResult = await authService.getUserProfile(userResult.user.id)
-        if (!profileResult.profile || profileResult.profile.role !== "stagiaire") {
-          router.push("/auth/login")
-          return
-        }
-
-        setUser(profileResult.profile)
-
-        // Load documents for this stagiaire
-        const documentsData = await documentsService.getAll({
-          stagiaireId: userResult.user.id,
-        })
-        setDocuments(documentsData || [])
-      } catch (error) {
-        console.error("Erreur lors du chargement:", error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadData()
-  }, [router])
-
-  const handleFileUpload = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    const formData = new FormData(event.currentTarget)
-    const file = formData.get("file") as File
-    const nom = formData.get("nom") as string
-    const description = formData.get("description") as string
-    const type = formData.get("type") as string
-
-    if (!file || !nom || !user) return
-
-    try {
-      await documentsService.upload(file, {
-        nom,
-        description,
-        type,
-        stagiaire_id: user.id,
-      })
-
-      // Reload documents
-      const documentsData = await documentsService.getAll({
-        stagiaireId: user.id,
-      })
-      setDocuments(documentsData || [])
-    } catch (error) {
-      console.error("Erreur lors de l'upload:", error)
-    }
-  }
-
-  const handleDownload = async (documentId: string) => {
-    try {
-      await documentsService.download(documentId)
-    } catch (error) {
-      console.error("Erreur lors du téléchargement:", error)
-    }
-  }
-
-  const handleDelete = async (documentId: string) => {
-    try {
-      await documentsService.delete(documentId)
-
-      // Reload documents
-      const documentsData = await documentsService.getAll({
-        stagiaireId: user.id,
-      })
-      setDocuments(documentsData || [])
-    } catch (error) {
-      console.error("Erreur lors de la suppression:", error)
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
-          <p className="mt-4">Chargement...</p>
-        </div>
-      </div>
-    )
-  }
+  // Filtrer les documents pour ce stagiaire (id=4)
+  const stagiaireId = "4" // Lucas Bernard
+  const documents = mockDocuments.filter((doc) => doc.stagiaireId === stagiaireId)
 
   const filteredDocuments = documents.filter((document) => {
     const matchesSearch =
       document.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (document.description && document.description.toLowerCase().includes(searchTerm.toLowerCase()))
+      document.description.toLowerCase().includes(searchTerm.toLowerCase())
 
     const matchesFormat = formatFilter === "all" || document.format === formatFilter
     const matchesType = typeFilter === "all" || document.type === typeFilter
@@ -188,49 +92,56 @@ export default function DocumentsPage() {
                   <DialogTitle>Ajouter un nouveau document</DialogTitle>
                   <DialogDescription>Téléchargez un nouveau document à votre dossier</DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleFileUpload}>
-                  <div className="grid gap-4 py-4">
-                    <div>
-                      <Label htmlFor="nom" className="text-right">
-                        Nom du document
-                      </Label>
-                      <Input id="nom" name="nom" className="mt-1" required />
-                    </div>
-                    <div>
-                      <Label htmlFor="description" className="text-right">
-                        Description
-                      </Label>
-                      <Textarea id="description" name="description" className="mt-1" />
-                    </div>
-                    <div>
-                      <Label htmlFor="type" className="text-right">
-                        Type de document
-                      </Label>
-                      <Select name="type" required>
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Sélectionner un type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="cv">CV</SelectItem>
-                          <SelectItem value="lettre_motivation">Lettre de motivation</SelectItem>
-                          <SelectItem value="lettre_recommandation">Lettre de recommandation</SelectItem>
-                          <SelectItem value="piece_identite">Pièce d'identité</SelectItem>
-                          <SelectItem value="certificat_scolarite">Certificat de scolarité</SelectItem>
-                          <SelectItem value="autre">Autre</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="file" className="text-right">
-                        Fichier
-                      </Label>
-                      <Input type="file" name="file" className="mt-1" required />
+                <div className="grid gap-4 py-4">
+                  <div>
+                    <Label htmlFor="name" className="text-right">
+                      Nom du document
+                    </Label>
+                    <Input id="name" className="mt-1" />
+                  </div>
+                  <div>
+                    <Label htmlFor="description" className="text-right">
+                      Description
+                    </Label>
+                    <Textarea id="description" className="mt-1" />
+                  </div>
+                  <div>
+                    <Label htmlFor="type" className="text-right">
+                      Type de document
+                    </Label>
+                    <Select>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Sélectionner un type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cv">CV</SelectItem>
+                        <SelectItem value="lettre_motivation">Lettre de motivation</SelectItem>
+                        <SelectItem value="lettre_recommandation">Lettre de recommandation</SelectItem>
+                        <SelectItem value="piece_identite">Pièce d'identité</SelectItem>
+                        <SelectItem value="certificat_scolarite">Certificat de scolarité</SelectItem>
+                        <SelectItem value="autre">Autre</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="file" className="text-right">
+                      Fichier
+                    </Label>
+                    <div className="mt-1 border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                      <input type="file" className="hidden" id="file" />
+                      <label htmlFor="file" className="cursor-pointer">
+                        <div className="flex flex-col items-center">
+                          <Plus className="h-8 w-8 text-gray-400 mb-2" />
+                          <span className="text-sm text-gray-500">Cliquez pour sélectionner un fichier</span>
+                          <span className="text-xs text-gray-400 mt-1">PDF, DOC, DOCX, JPG, PNG (max 5MB)</span>
+                        </div>
+                      </label>
                     </div>
                   </div>
-                  <DialogFooter>
-                    <Button type="submit">Télécharger</Button>
-                  </DialogFooter>
-                </form>
+                </div>
+                <DialogFooter>
+                  <Button type="submit">Télécharger</Button>
+                </DialogFooter>
               </DialogContent>
             </Dialog>
           </div>
@@ -308,20 +219,10 @@ export default function DocumentsPage() {
                         {getDocumentIcon(document.format)}
                       </div>
                       <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={() => handleDownload(document.id)}
-                        >
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                           <Download className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
-                          onClick={() => handleDelete(document.id)}
-                        >
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500 hover:text-red-700">
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>

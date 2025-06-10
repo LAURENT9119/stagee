@@ -9,11 +9,11 @@ export interface Database {
           email: string
           name: string
           role: "stagiaire" | "tuteur" | "rh" | "admin" | "finance"
-          phone: string | null
-          address: string | null
-          avatar_url: string | null
-          department: string | null
-          position: string | null
+          phone?: string
+          address?: string
+          avatar_url?: string
+          department?: string
+          position?: string
           created_at: string
           updated_at: string
         }
@@ -22,11 +22,11 @@ export interface Database {
           email: string
           name: string
           role: "stagiaire" | "tuteur" | "rh" | "admin" | "finance"
-          phone?: string | null
-          address?: string | null
-          avatar_url?: string | null
-          department?: string | null
-          position?: string | null
+          phone?: string
+          address?: string
+          avatar_url?: string
+          department?: string
+          position?: string
           created_at?: string
           updated_at?: string
         }
@@ -35,12 +35,11 @@ export interface Database {
           email?: string
           name?: string
           role?: "stagiaire" | "tuteur" | "rh" | "admin" | "finance"
-          phone?: string | null
-          address?: string | null
-          avatar_url?: string | null
-          department?: string | null
-          position?: string | null
-          created_at?: string
+          phone?: string
+          address?: string
+          avatar_url?: string
+          department?: string
+          position?: string
           updated_at?: string
         }
       }
@@ -51,17 +50,17 @@ export interface Database {
           nom: string
           prenom: string
           email: string
-          telephone: string | null
-          adresse: string | null
-          date_naissance: string | null
-          formation: string | null
-          ecole: string | null
-          niveau: string | null
+          telephone?: string
+          adresse?: string
+          date_naissance?: string
+          formation?: string
+          ecole?: string
+          niveau?: string
           periode: string
-          date_debut: string | null
-          date_fin: string | null
-          tuteur_id: string | null
-          departement: string | null
+          date_debut?: string
+          date_fin?: string
+          tuteur_id: string
+          departement?: string
           statut: "actif" | "termine" | "en_attente"
           created_at: string
           updated_at: string
@@ -72,18 +71,18 @@ export interface Database {
           nom: string
           prenom: string
           email: string
-          telephone?: string | null
-          adresse?: string | null
-          date_naissance?: string | null
-          formation?: string | null
-          ecole?: string | null
-          niveau?: string | null
+          telephone?: string
+          adresse?: string
+          date_naissance?: string
+          formation?: string
+          ecole?: string
+          niveau?: string
           periode: string
-          date_debut?: string | null
-          date_fin?: string | null
-          tuteur_id?: string | null
-          departement?: string | null
-          statut?: "actif" | "termine" | "en_attente"
+          date_debut?: string
+          date_fin?: string
+          tuteur_id: string
+          departement?: string
+          statut: "actif" | "termine" | "en_attente"
           created_at?: string
           updated_at?: string
         }
@@ -93,19 +92,18 @@ export interface Database {
           nom?: string
           prenom?: string
           email?: string
-          telephone?: string | null
-          adresse?: string | null
-          date_naissance?: string | null
-          formation?: string | null
-          ecole?: string | null
-          niveau?: string | null
+          telephone?: string
+          adresse?: string
+          date_naissance?: string
+          formation?: string
+          ecole?: string
+          niveau?: string
           periode?: string
-          date_debut?: string | null
-          date_fin?: string | null
-          tuteur_id?: string | null
-          departement?: string | null
+          date_debut?: string
+          date_fin?: string
+          tuteur_id?: string
+          departement?: string
           statut?: "actif" | "termine" | "en_attente"
-          created_at?: string
           updated_at?: string
         }
       }
@@ -117,12 +115,12 @@ export interface Database {
           statut: "En attente" | "Validé" | "Refusé"
           details: string
           stagiaire_id: string
-          tuteur_id: string | null
-          tuteur_decision: "En attente" | "Validé" | "Refusé"
-          rh_decision: "En attente" | "Validé" | "Refusé"
-          date_debut: string | null
-          date_fin: string | null
-          duree: string | null
+          tuteur_id?: string
+          tuteur_decision?: "En attente" | "Validé" | "Refusé"
+          rh_decision?: "En attente" | "Validé" | "Refusé"
+          date_debut?: string
+          date_fin?: string
+          duree?: string
           created_at: string
           updated_at: string
         }
@@ -130,15 +128,15 @@ export interface Database {
           id?: string
           date: string
           type: "stage_academique" | "stage_professionnel" | "conge" | "prolongation" | "attestation"
-          statut?: "En attente" | "Validé" | "Refusé"
+          statut: "En attente" | "Validé" | "Refusé"
           details: string
           stagiaire_id: string
-          tuteur_id?: string | null
+          tuteur_id?: string
           tuteur_decision?: "En attente" | "Validé" | "Refusé"
           rh_decision?: "En attente" | "Validé" | "Refusé"
-          date_debut?: string | null
-          date_fin?: string | null
-          duree?: string | null
+          date_debut?: string
+          date_fin?: string
+          duree?: string
           created_at?: string
           updated_at?: string
         }
@@ -149,14 +147,38 @@ export interface Database {
           statut?: "En attente" | "Validé" | "Refusé"
           details?: string
           stagiaire_id?: string
-          tuteur_id?: string | null
+          tuteur_id?: string
           tuteur_decision?: "En attente" | "Validé" | "Refusé"
           rh_decision?: "En attente" | "Validé" | "Refusé"
-          date_debut?: string | null
-          date_fin?: string | null
-          duree?: string | null
-          created_at?: string
+          date_debut?: string
+          date_fin?: string
+          duree?: string
           updated_at?: string
+        }
+      }
+      commentaires: {
+        Row: {
+          id: string
+          demande_id: string
+          user_id: string
+          message: string
+          date: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          demande_id: string
+          user_id: string
+          message: string
+          date: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          demande_id?: string
+          user_id?: string
+          message?: string
+          date?: string
         }
       }
       documents: {
@@ -164,7 +186,7 @@ export interface Database {
           id: string
           date: string
           nom: string
-          description: string | null
+          description: string
           format: "PDF" | "DOC" | "IMG"
           stagiaire_id: string
           type:
@@ -177,7 +199,7 @@ export interface Database {
             | "attestation"
             | "autre"
           url: string
-          taille: string | null
+          taille?: string
           created_at: string
           updated_at: string
         }
@@ -185,7 +207,7 @@ export interface Database {
           id?: string
           date: string
           nom: string
-          description?: string | null
+          description: string
           format: "PDF" | "DOC" | "IMG"
           stagiaire_id: string
           type:
@@ -198,7 +220,7 @@ export interface Database {
             | "attestation"
             | "autre"
           url: string
-          taille?: string | null
+          taille?: string
           created_at?: string
           updated_at?: string
         }
@@ -206,7 +228,7 @@ export interface Database {
           id?: string
           date?: string
           nom?: string
-          description?: string | null
+          description?: string
           format?: "PDF" | "DOC" | "IMG"
           stagiaire_id?: string
           type?:
@@ -219,8 +241,7 @@ export interface Database {
             | "attestation"
             | "autre"
           url?: string
-          taille?: string | null
-          created_at?: string
+          taille?: string
           updated_at?: string
         }
       }
@@ -252,7 +273,54 @@ export interface Database {
           date?: string
           commentaire?: string
           note_globale?: number
+          updated_at?: string
+        }
+      }
+      competences_evaluation: {
+        Row: {
+          id: string
+          evaluation_id: string
+          nom: string
+          note: number
+        }
+        Insert: {
+          id?: string
+          evaluation_id: string
+          nom: string
+          note: number
+        }
+        Update: {
+          id?: string
+          evaluation_id?: string
+          nom?: string
+          note?: number
+        }
+      }
+      templates: {
+        Row: {
+          id: string
+          nom: string
+          description: string
+          type: "convention" | "attestation" | "evaluation" | "autre"
+          contenu: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          nom: string
+          description: string
+          type: "convention" | "attestation" | "evaluation" | "autre"
+          contenu: string
           created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          nom?: string
+          description?: string
+          type?: "convention" | "attestation" | "evaluation" | "autre"
+          contenu?: string
           updated_at?: string
         }
       }
@@ -273,7 +341,7 @@ export interface Database {
           titre: string
           message: string
           type: "info" | "success" | "warning" | "error"
-          lu?: boolean
+          lu: boolean
           date: string
           created_at?: string
         }
@@ -285,7 +353,6 @@ export interface Database {
           type?: "info" | "success" | "warning" | "error"
           lu?: boolean
           date?: string
-          created_at?: string
         }
       }
     }
@@ -296,13 +363,13 @@ export interface Database {
           nom: string
           prenom: string
           email: string
-          telephone: string | null
-          formation: string | null
-          ecole: string | null
+          telephone?: string
+          formation?: string
+          ecole?: string
           periode: string
-          tuteur_nom: string | null
-          departement: string | null
-          statut: string
+          tuteur_nom: string
+          departement?: string
+          statut: "actif" | "termine" | "en_attente"
           nb_demandes: number
           nb_documents: number
         }
@@ -311,14 +378,14 @@ export interface Database {
         Row: {
           id: string
           date: string
-          type: string
-          statut: string
+          type: "stage_academique" | "stage_professionnel" | "conge" | "prolongation" | "attestation"
+          statut: "En attente" | "Validé" | "Refusé"
           details: string
           stagiaire_nom: string
           stagiaire_prenom: string
-          tuteur_nom: string | null
-          tuteur_decision: string
-          rh_decision: string
+          tuteur_nom?: string
+          tuteur_decision?: "En attente" | "Validé" | "Refusé"
+          rh_decision?: "En attente" | "Validé" | "Refusé"
           nb_commentaires: number
         }
       }
@@ -327,14 +394,21 @@ export interface Database {
       get_dashboard_stats: {
         Args: {
           user_id: string
-          role: string
+          role: "stagiaire" | "tuteur" | "rh" | "admin" | "finance"
         }
-        Returns: Json
+        Returns: {
+          stagiaires_actifs: number
+          stagiaires_total: number
+          demandes_en_cours: number
+          demandes_total: number
+          documents_total: number
+          evaluations_total: number
+        }
       }
       search_stagiaires: {
         Args: {
           search_term: string
-          status_filter?: string
+          status_filter?: "actif" | "termine" | "en_attente"
           department_filter?: string
         }
         Returns: {
@@ -342,11 +416,11 @@ export interface Database {
           nom: string
           prenom: string
           email: string
-          formation: string
-          ecole: string
+          formation?: string
+          ecole?: string
           tuteur_nom: string
-          departement: string
-          statut: string
+          departement?: string
+          statut: "actif" | "termine" | "en_attente"
         }[]
       }
     }
