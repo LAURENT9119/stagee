@@ -1,123 +1,74 @@
-import { supabase } from "../supabase/client"
-import type { Database } from "../supabase/database.types"
+import { createClient } from "@/lib/supabase/client"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
 
-export type User = Database["public"]["Tables"]["users"]["Row"]
+export class AuthService {
+  private supabase = createClient()
 
-export const authService = {
-  async login(email: string, password: string) {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+  async signIn(email: string, password: string) {
+    try {
+      const { data, error } = await this.supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-    if (error) throw new Error(error.message)
+      if (error) throw error
 
-    // Récupérer les informations utilisateur complètes
-    const { data: userData, error: userError } = await supabase
-      .from("users")
-      .select("*")
-      .eq("id", data.user.id)
-      .single()
-
-    if (userError) throw new Error(userError.message)
-
-    return {
-      user: userData,
-      session: data.session,
+      return { user: data.user, session: data.session, error: null }
+    } catch (error) {
+      return { user: null, session: null, error: error as Error }
     }
-  },
+  }
 
-  async register(email: string, password: string, userData: Partial<User>) {
-    // Créer l'utilisateur dans Auth
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          name: userData.name,
-          role: userData.role || "stagiaire",
-        },
-      },
-    })
-
-    if (error) throw new Error(error.message)
-
-    // Créer l'entrée dans la table users
-    const { error: insertError } = await supabase.from("users").insert({
-      id: data.user!.id,
-      email: email,
-      name: userData.name || "",
-      role: userData.role || "stagiaire",
-      phone: userData.phone,
-      address: userData.address,
-      department: userData.department,
-      position: userData.position,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-
-    if (insertError) throw new Error(insertError.message)
-
-    return {
-      user: data.user,
-      session: data.session,
+  async signOut() {
+    try {
+      const { error } = await this.supabase.auth.signOut()
+      if (error) throw error
+      return { error: null }
+    } catch (error) {
+      return { error: error as Error }
     }
-  },
-
-  async logout() {
-    const { error } = await supabase.auth.signOut()
-    if (error) throw new Error(error.message)
-    return true
-  },
+  }
 
   async getCurrentUser() {
-    const { data, error } = await supabase.auth.getUser()
+    try {
+      const {
+        data: { user },
+        error,
+      } = await this.supabase.auth.getUser()
+      if (error) throw error
+      return { user, error: null }
+    } catch (error) {
+      return { user: null, error: error as Error }
+    }
+  }
 
-    if (error || !data.user) return null
+  async getUserProfile(userId: string) {
+    try {
+      const { data, error } = await this.supabase.from("users").select("*").eq("id", userId).single()
 
-    // Récupérer les informations utilisateur complètes
-    const { data: userData, error: userError } = await supabase
-      .from("users")
-      .select("*")
-      .eq("id", data.user.id)
-      .single()
+      if (error) throw error
+      return { profile: data, error: null }
+    } catch (error) {
+      return { profile: null, error: error as Error }
+    }
+  }
+}
 
-    if (userError) return null
+// Instance singleton
+export const authService = new AuthService()
 
-    return userData
-  },
+// Server-side auth helper
+export async function getServerUser() {
+  try {
+    const supabase = await createServerSupabaseClient()
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser()
 
-  async updateProfile(userId: string, userData: Partial<User>) {
-    const { error } = await supabase
-      .from("users")
-      .update({
-        ...userData,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", userId)
-
-    if (error) throw new Error(error.message)
-
-    return true
-  },
-
-  async updatePassword(password: string) {
-    const { error } = await supabase.auth.updateUser({
-      password,
-    })
-
-    if (error) throw new Error(error.message)
-
-    return true
-  },
-
-  async resetPassword(email: string) {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    })
-
-    if (error) throw new Error(error.message)
-
-    return true
-  },
+    if (error) throw error
+    return { user, error: null }
+  } catch (error) {
+    return { user: null, error: error as Error }
+  }
 }

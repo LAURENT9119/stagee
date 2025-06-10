@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { Sidebar } from "@/components/layout/sidebar"
@@ -8,11 +9,88 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Calendar, FileText, Users, CheckCircle } from "lucide-react"
-import { mockDemandes } from "@/lib/mock-data"
+import { dashboardService } from "@/lib/services/dashboard-service"
+import { authService } from "@/lib/services/auth-service"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 
+interface StagiaireStats {
+  demandeEnCours: number
+  demandeValidee: number
+  documentCount: number
+  joursRestants: number
+  recentDemandes: any[]
+}
+
 export default function StagiaireDashboard() {
-  const user = { name: "Nom stagiaire", role: "stagiaire" }
+  const [user, setUser] = useState<any>(null)
+  const [stats, setStats] = useState<StagiaireStats | null>(null)
+  const [loading, setLoading] = useState(true)
+  const router = useRouter()
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const userResult = await authService.getCurrentUser()
+        if (!userResult.user) {
+          router.push("/auth/login")
+          return
+        }
+
+        const profileResult = await authService.getUserProfile(userResult.user.id)
+        if (!profileResult.profile || profileResult.profile.role !== "stagiaire") {
+          router.push("/auth/login")
+          return
+        }
+
+        setUser(profileResult.profile)
+
+        const dashboardStats = await dashboardService.getStagiaireStats(userResult.user.id)
+        setStats(dashboardStats)
+      } catch (error) {
+        console.error("Erreur lors du chargement:", error)
+        router.push("/auth/login")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadData()
+  }, [router])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+          <p className="mt-4">Chargement...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user || !stats) {
+    return null
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("fr-FR")
+  }
+
+  const getStatusBadge = (statut: string) => {
+    switch (statut) {
+      case "en_attente":
+        return <Badge className="bg-orange-100 text-orange-800">En attente</Badge>
+      case "approuvee":
+        return <Badge className="bg-green-100 text-green-800">Approuvée</Badge>
+      case "rejetee":
+        return <Badge className="bg-red-100 text-red-800">Rejetée</Badge>
+      case "en_cours_traitement":
+        return <Badge className="bg-blue-100 text-blue-800">En cours</Badge>
+      default:
+        return <Badge className="bg-gray-100 text-gray-800">{statut}</Badge>
+    }
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -25,11 +103,15 @@ export default function StagiaireDashboard() {
           <div className="mb-6">
             <div className="flex items-center space-x-4 mb-4">
               <Avatar className="w-16 h-16">
-                <AvatarFallback className="bg-gray-300 text-2xl">S</AvatarFallback>
+                <AvatarFallback className="bg-gray-300 text-2xl">
+                  {user.first_name?.[0]?.toUpperCase() || "S"}
+                </AvatarFallback>
               </Avatar>
               <div>
-                <h1 className="text-2xl font-bold">Bonjour, --Nom stagiaire--</h1>
-                <p className="text-gray-600">Ceci est votre tableau de bord qui recence l'ensemble de vos activités</p>
+                <h1 className="text-2xl font-bold">
+                  Bonjour, {user.first_name} {user.last_name}
+                </h1>
+                <p className="text-gray-600">Ceci est votre tableau de bord qui recense l'ensemble de vos activités</p>
               </div>
             </div>
           </div>
@@ -38,25 +120,25 @@ export default function StagiaireDashboard() {
             <Card className="border border-gray-200 rounded-lg">
               <CardContent className="p-6 text-center">
                 <div className="flex items-center justify-center mb-2">
-                  <span className="text-3xl font-bold">2</span>
+                  <span className="text-3xl font-bold">{stats.demandeEnCours}</span>
                   <div className="ml-2 w-6 h-6 bg-gray-800 rounded flex items-center justify-center">
                     <Users className="w-4 h-4 text-white" />
                   </div>
                 </div>
-                <h3 className="font-semibold mb-1">Demande en Cours</h3>
-                <p className="text-sm text-gray-600">Demande en cours de traitement</p>
+                <h3 className="font-semibold mb-1">Demandes en cours</h3>
+                <p className="text-sm text-gray-600">Demandes en cours de traitement</p>
               </CardContent>
             </Card>
 
             <Card className="border border-gray-200 rounded-lg">
               <CardContent className="p-6 text-center">
                 <div className="flex items-center justify-center mb-2">
-                  <span className="text-3xl font-bold">5</span>
+                  <span className="text-3xl font-bold">{stats.demandeValidee}</span>
                   <div className="ml-2 w-6 h-6 bg-gray-800 rounded flex items-center justify-center">
                     <CheckCircle className="w-4 h-4 text-white" />
                   </div>
                 </div>
-                <h3 className="font-semibold mb-1">Demande en validées</h3>
+                <h3 className="font-semibold mb-1">Demandes validées</h3>
                 <p className="text-sm text-gray-600">Vos demandes approuvées</p>
               </CardContent>
             </Card>
@@ -64,13 +146,13 @@ export default function StagiaireDashboard() {
             <Card className="border border-gray-200 rounded-lg">
               <CardContent className="p-6 text-center">
                 <div className="flex items-center justify-center mb-2">
-                  <span className="text-3xl font-bold">5</span>
+                  <span className="text-3xl font-bold">{stats.documentCount}</span>
                   <div className="ml-2 w-6 h-6 bg-gray-800 rounded flex items-center justify-center">
                     <FileText className="w-4 h-4 text-white" />
                   </div>
                 </div>
                 <h3 className="font-semibold mb-1">Documents</h3>
-                <p className="text-sm text-gray-600">Les documents que vous nous avez fournis</p>
+                <p className="text-sm text-gray-600">Documents que vous avez fournis</p>
               </CardContent>
             </Card>
 
@@ -80,14 +162,14 @@ export default function StagiaireDashboard() {
                   <Calendar className="w-8 h-8 text-gray-400" />
                 </div>
                 <h3 className="font-semibold mb-1">Jours restants</h3>
-                <div className="text-3xl font-bold">70 jours</div>
+                <div className="text-3xl font-bold">{stats.joursRestants} jours</div>
               </CardContent>
             </Card>
           </div>
 
           <div className="bg-white border border-gray-200 rounded-lg">
             <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-              <h2 className="text-xl font-semibold">Suivis des demandes</h2>
+              <h2 className="text-xl font-semibold">Suivi des demandes</h2>
               <Link href="/stagiaire/demande/new">
                 <Button className="bg-blue-500 hover:bg-blue-600 text-white">Effectuer une demande</Button>
               </Link>
@@ -104,14 +186,12 @@ export default function StagiaireDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {mockDemandes.map((demande) => (
+                  {stats.recentDemandes.map((demande) => (
                     <tr key={demande.id}>
-                      <td className="px-6 py-4 text-sm">{demande.date}</td>
+                      <td className="px-6 py-4 text-sm">{formatDate(demande.created_at)}</td>
                       <td className="px-6 py-4 text-sm">{demande.type}</td>
-                      <td className="px-6 py-4">
-                        <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100">{demande.statut}</Badge>
-                      </td>
-                      <td className="px-6 py-4 text-sm">{demande.details}</td>
+                      <td className="px-6 py-4">{getStatusBadge(demande.statut)}</td>
+                      <td className="px-6 py-4 text-sm">{demande.titre || demande.description}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -119,10 +199,16 @@ export default function StagiaireDashboard() {
             </div>
           </div>
 
-          <div className="mt-6 bg-green-100 border border-green-300 rounded-lg p-4">
-            <p className="text-green-800 font-medium">Notification</p>
-            <p className="text-green-700">Votre demande à été envoyé avec succès</p>
-          </div>
+          {stats.demandeEnCours > 0 && (
+            <div className="mt-6 bg-green-100 border border-green-300 rounded-lg p-4">
+              <p className="text-green-800 font-medium">Notification</p>
+              <p className="text-green-700">
+                {stats.demandeEnCours > 0
+                  ? `Vous avez ${stats.demandeEnCours} demande(s) en cours de traitement`
+                  : "Aucune demande en cours"}
+              </p>
+            </div>
+          )}
         </main>
       </div>
 

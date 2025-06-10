@@ -1,97 +1,163 @@
 "use client"
 
-import { Button } from "@/components/ui/button"
-import { Users, FileText, User, BarChart3, LogOut } from "lucide-react"
+import type React from "react"
+
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
+import { Icons } from "@/components/icons"
+import { cn } from "@/lib/utils"
+import { buttonVariants } from "@/components/ui/button"
+import type { SidebarNavItem } from "@/types"
+import { auth } from "@/lib/auth"
+import { Settings } from "lucide-react"
+
 interface SidebarProps {
-  role: "admin" | "rh" | "tuteur" | "stagiaire"
+  items: SidebarNavItem[]
 }
 
-export function Sidebar({ role }: SidebarProps) {
+function SidebarNav({ items }: SidebarProps) {
   const pathname = usePathname()
+  return (
+    <div className="flex flex-col space-y-2">
+      {items?.length
+        ? items.map((item, index) => (
+            <SidebarMenuItem key={index}>
+              <SidebarMenuButton asChild>
+                <Link
+                  href={item.href}
+                  className={cn(
+                    buttonVariants({ variant: "ghost", size: "sm", className: "w-full justify-start" }),
+                    pathname === item.href
+                      ? "bg-secondary text-secondary-foreground hover:bg-secondary hover:text-secondary-foreground"
+                      : "hover:bg-accent hover:text-accent-foreground",
+                    item.disabled && "cursor-not-allowed opacity-80",
+                  )}
+                >
+                  {item.icon && <Icons.arrowRight className="mr-2 h-4 w-4" />}
+                  {item.title}
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))
+        : null}
+      {/* Add more items here */}
+    </div>
+  )
+}
 
-  const getMenuItems = () => {
-    switch (role) {
-      case "admin":
-        return [
-          { href: "/admin", icon: BarChart3, label: "Gestion des membres" },
-          { href: "/admin/stagiaires", icon: Users, label: "Gestion des stagiaires" },
-          { href: "/admin/templates", icon: FileText, label: "Modèles de documents" },
-          { href: "/admin/reports", icon: BarChart3, label: "Rapports" },
-          { href: "/admin/profile", icon: User, label: "Mon profil" },
-        ]
-      case "rh":
-        return [
-          { href: "/rh", icon: BarChart3, label: "Statistiques" },
-          { href: "/rh/documents", icon: FileText, label: "Documents" },
-          { href: "/rh/statistiques", icon: BarChart3, label: "Statistiques" },
-          { href: "/rh/profile", icon: User, label: "Mon profil" },
-        ]
-      case "tuteur":
-        return [
-          { href: "/tuteur", icon: Users, label: "Tuteurs" },
-          { href: "/tuteur/demandes", icon: FileText, label: "Demandes" },
-          { href: "/tuteur/evaluations", icon: Users, label: "Évaluations" },
-          { href: "/tuteur/profile", icon: User, label: "Mon profil" },
-        ]
-      case "stagiaire":
-        return [
-          { href: "/stagiaire", icon: Users, label: "Stagiaires" },
-          { href: "/stagiaire/documents", icon: FileText, label: "Mes documents" },
-          { href: "/stagiaire/demandes", icon: FileText, label: "Demandes" },
-          { href: "/stagiaire/profile", icon: User, label: "Mon profil" },
-        ]
-      default:
-        return []
-    }
+interface SidebarMenuProps {
+  children: React.ReactNode
+}
+
+function SidebarMenu({ children }: SidebarMenuProps) {
+  return <ul className="mt-2 border-t pt-4">{children}</ul>
+}
+
+interface SidebarMenuItemProps {
+  children: React.ReactNode
+}
+
+function SidebarMenuItem({ children }: SidebarMenuItemProps) {
+  return <li>{children}</li>
+}
+
+import type { ReactNode } from "react"
+import { Button } from "@/components/ui/button"
+
+interface SidebarMenuButtonProps {
+  children: ReactNode
+  asChild?: boolean
+}
+
+function SidebarMenuButton({ children, asChild }: SidebarMenuButtonProps) {
+  if (asChild) {
+    return <>{children}</>
   }
+  return (
+    <Button variant="ghost" size="sm" className="w-full justify-start">
+      {children}
+    </Button>
+  )
+}
 
-  const menuItems = getMenuItems()
-  const roleTitle =
-    role === "admin"
-      ? "Administrateur"
-      : role === "rh"
-        ? "Ressources humaines"
-        : role === "tuteur"
-          ? "Tuteurs"
-          : "Stagiaire"
+export async function Sidebar() {
+  const user = await auth()?.user
 
   return (
-    <div className="w-64 bg-gray-100 border-r border-gray-200 h-screen flex flex-col">
-      <div className="p-4 border-b border-gray-200">
-        <h2 className="font-semibold text-gray-800">{roleTitle}</h2>
+    <div className="flex flex-col space-y-6 w-[280px]">
+      <div className="flex-1 space-y-2">
+        <h2 className="text-2xl font-semibold tracking-tight">Administration</h2>
+        <p className="text-sm text-muted-foreground">Navigation et gestion de votre compte.</p>
+        <SidebarNav
+          items={[
+            {
+              title: "Aperçu",
+              href: "/admin",
+              icon: true,
+            },
+            {
+              title: "Facturation",
+              href: "/admin/billing",
+              icon: true,
+            },
+            {
+              title: "Paramètres",
+              href: "/admin/settings",
+              icon: true,
+            },
+          ]}
+        />
       </div>
-
-      <nav className="flex-1 px-4 py-2">
-        {menuItems.map((item) => {
-          const Icon = item.icon
-          const isActive = pathname === item.href
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center space-x-3 px-3 py-3 rounded-lg mb-1 transition-colors ${
-                isActive ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              <Icon className="h-5 w-5" />
-              <span className="text-sm">{item.label}</span>
-            </Link>
-          )
-        })}
-      </nav>
-
-      <div className="p-4 border-t border-gray-200">
-        <Link href="/auth/login">
-          <Button variant="outline" className="w-full justify-start" size="sm">
-            <LogOut className="h-4 w-4 mr-2" />
-            Log Out
-          </Button>
-        </Link>
-      </div>
+      {user?.role === "admin" && (
+        <div className="flex-1 space-y-2">
+          <h2 className="text-sm font-semibold tracking-tight">Section Admin</h2>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild>
+                <Link href="/admin/users" className="flex items-center gap-2">
+                  <Icons.users className="h-4 w-4" />
+                  Utilisateurs
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild>
+                <Link href="/admin/products" className="flex items-center gap-2">
+                  <Icons.package className="h-4 w-4" />
+                  Produits
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild>
+                <Link href="/admin/orders" className="flex items-center gap-2">
+                  <Icons.shoppingCart className="h-4 w-4" />
+                  Commandes
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild>
+                <Link href="/admin/reports" className="flex items-center gap-2">
+                  <Icons.barChart className="h-4 w-4" />
+                  Rapports
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            {user?.role === "admin" && (
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <Link href="/admin/test-crud" className="flex items-center gap-2">
+                    <Settings className="h-4 w-4" />
+                    Test CRUD
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+          </SidebarMenu>
+        </div>
+      )}
     </div>
   )
 }
